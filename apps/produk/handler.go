@@ -1,59 +1,60 @@
 package produk
 
 import (
-	"encoding/json"
 	"evermos/config"
 	"evermos/models"
-	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 )
 
 // Membuat produk baru (POST)
-func CreateProdukHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(float64)
+func CreateProdukHandler(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
 
 	// Cari ID Toko berdasarkan User ID
 	var toko models.Toko
 	config.DB.Where("id_user = ?", userID).First(&toko)
 
 	var input models.Produk
-	json.NewDecoder(r.Body).Decode(&input)
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Format data tidak valid",
+		})
+	}
 
 	input.IDToko = toko.ID
 
 	res, err := CreateProduk(input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal buat produk"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal buat produk",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Berhasil membuat data", "data": res.ID})
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"status":  true,
+		"message": "Berhasil membuat data",
+		"data":    res.ID,
+	})
 }
 
-// Mengambil data produk (GET)
-func GetAllProdukHandler(w http.ResponseWriter, r *http.Request) {
-	// Mengambil query parameter dari URL
-	nama := r.URL.Query().Get("nama")
-	categoryID := r.URL.Query().Get("id_category")
+// Mengambil data produk dengan Filter (GET)
+func GetAllProdukHandler(c *fiber.Ctx) error {
+	nama := c.Query("nama")
+	categoryID := c.Query("id_category")
 
 	res, err := GetAllProduk(nama, categoryID)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal mengambil data",
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil mengambil semua data",
 		"data":    res,
@@ -61,71 +62,67 @@ func GetAllProdukHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Mengambil produk berdasarkan ID (GET)
-func GetProdukByIDHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
+func GetProdukByIDHandler(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
 
 	res, err := GetProdukByID(uint(id))
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Produk tidak ditemukan"})
-		return
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status":  false,
+			"message": "Produk tidak ditemukan",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Berhasil mengambil data berdasarkan ID", "data": res})
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"message": "Berhasil mengambil data berdasarkan ID",
+		"data":    res,
+	})
 }
 
 // Memperbarui produk (PUT)
-func UpdateProdukHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
-	userID := r.Context().Value("user_id").(float64)
+func UpdateProdukHandler(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	userID := c.Locals("user_id").(float64)
 
-	// Cari ID Toko pemilik
 	var toko models.Toko
 	config.DB.Where("id_user = ?", userID).First(&toko)
 
 	var input models.Produk
-	json.NewDecoder(r.Body).Decode(&input)
+	c.BodyParser(&input)
 
 	err := UpdateProduk(uint(id), toko.ID, input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"status":  false,
 			"message": err.Error(),
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil memperbarui data",
-		"data":    "",
 	})
 }
 
 // Menghapus data produk (DELETE)
-func DeleteProdukHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
-	userID := r.Context().Value("user_id").(float64)
+func DeleteProdukHandler(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
+	userID := c.Locals("user_id").(float64)
 
 	var toko models.Toko
 	config.DB.Where("id_user = ?", userID).First(&toko)
 
 	err := DeleteProduk(uint(id), toko.ID)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal hapus produk"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal hapus produk",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Berhasil menghapus data", "data": ""})
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"message": "Berhasil menghapus data",
+	})
 }

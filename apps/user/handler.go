@@ -1,32 +1,37 @@
 package user
 
 import (
-	"encoding/json"
 	"evermos/apps/wilayah"
 	"evermos/models"
 	"fmt"
-	"net/http"
+	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 )
 
-// Mengambil Data User yang Login
-func GetMyProfileHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(float64)
+// Struct untuk menampilkan nama provinsi dan kota saat ambil data user
+type UserProfileResponse struct {
+	models.User
+	NamaProvinsi string `json:"nama_provinsi"`
+	NamaKota     string `json:"nama_kota"`
+}
+
+// Mengambil data user yang login (GET)
+func GetMyProfileHandler(c *fiber.Ctx) error {
+	// Ambil id user
+	userID := c.Locals("user_id").(float64)
+
 	userData, err := GetMyProfile(uint(userID))
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"status":  false,
 			"message": "User tidak ditemukan",
 		})
-		return
 	}
 
 	response := UserProfileResponse{User: userData}
 
-	// Ambil Data API Wilayah untuk Provinsi dan ota
+	// Integrasi data API Wilayah untuk provinsi dan kota
 	if userData.IDProvinsi != "" {
 		provList, _ := wilayah.GetProvinces()
 		for _, p := range provList {
@@ -47,114 +52,110 @@ func GetMyProfileHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil mengambil data",
 		"data":    response,
 	})
 }
 
-type UserProfileResponse struct {
-	models.User
-	NamaProvinsi string `json:"nama_provinsi"`
-	NamaKota     string `json:"nama_kota"`
-}
-
 // Perbarui Akun User yang Login (PUT)
-func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(float64)
+func UpdateProfileHandler(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
 
 	var input models.User
-	json.NewDecoder(r.Body).Decode(&input)
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Invalid input",
+		})
+	}
 
 	err := UpdateProfile(uint(userID), input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal update profil"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal update profil",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Update profil berhasil",
 	})
 }
 
 // Ubah Password User (PUT)
-func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(float64)
+func ChangePasswordHandler(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
 
 	var input struct {
 		PasswordBaru string `json:"password_baru"`
 	}
-	json.NewDecoder(r.Body).Decode(&input)
+	c.BodyParser(&input)
 
 	if len(input.PasswordBaru) < 6 {
-		http.Error(w, "Password minimal 6 karakter", http.StatusBadRequest)
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Password minimal 6 karakter",
+		})
 	}
 
 	err := ChangePassword(uint(userID), input.PasswordBaru)
 	if err != nil {
-		http.Error(w, "Gagal mengganti password", http.StatusInternalServerError)
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal mengganti password",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Password berhasil diganti"})
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"message": "Password berhasil diganti",
+	})
 }
 
 // Membuat alamat baru (POST)
-func CreateAlamatHandler(w http.ResponseWriter, r *http.Request) {
+func CreateAlamatHandler(c *fiber.Ctx) error {
 	var input models.Alamat
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Invalid input",
+		})
 	}
 
-	// Mengambil userID dari context (dari AuthMiddleware)
-	userIDFloat := r.Context().Value("user_id").(float64)
+	userIDFloat := c.Locals("user_id").(float64)
 	input.IDUser = uint(userIDFloat)
 
 	res, err := CreateAlamat(input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal menambah alamat",
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil menyimpan data",
 		"data":    res.ID,
 	})
 }
 
-// Mengambil data alamat (GET)
-func GetMyAlamatHandler(w http.ResponseWriter, r *http.Request) {
-	userIDFloat := r.Context().Value("user_id").(float64)
+// Mengambil data alamat milik user (GET)
+func GetMyAlamatHandler(c *fiber.Ctx) error {
+	userIDFloat := c.Locals("user_id").(float64)
 
 	res, err := GetMyAlamat(uint(userIDFloat))
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal mengambil data alamat",
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil mendapat data",
 		"data":    res,
@@ -162,47 +163,48 @@ func GetMyAlamatHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Memperbarui alamat (PUT)
-func UpdateAlamatHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
+func UpdateAlamatHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	userID := c.Locals("user_id").(float64)
 
 	var input models.Alamat
-	json.NewDecoder(r.Body).Decode(&input)
+	c.BodyParser(&input)
 
-	userID := r.Context().Value("user_id").(float64)
+	addrID, _ := strconv.ParseUint(idStr, 10, 32)
 
-	var addrID uint
-	fmt.Sscanf(id, "%d", &addrID)
-
-	err := UpdateAlamat(addrID, uint(userID), input)
+	err := UpdateAlamat(uint(addrID), uint(userID), input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal update atau data tidak ditemukan"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal update atau data tidak ditemukan",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Berhasil update data.", "data": ""})
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"message": "Berhasil update data.",
+		"data":    "",
+	})
 }
 
 // Menghapus alamat (DELETE)
-func DeleteAlamatHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
-	userID := r.Context().Value("user_id").(float64)
+func DeleteAlamatHandler(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	userID := c.Locals("user_id").(float64)
 
-	var addrID uint
-	fmt.Sscanf(id, "%d", &addrID)
+	addrID, _ := strconv.ParseUint(idStr, 10, 32)
 
-	err := DeleteAlamat(addrID, uint(userID))
+	err := DeleteAlamat(uint(addrID), uint(userID))
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal menghapus data"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal menghapus data",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": true, "message": "Berhasil menghapus data.", "data": ""})
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"message": "Berhasil menghapus data.",
+		"data":    "",
+	})
 }

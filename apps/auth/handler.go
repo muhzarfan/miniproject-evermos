@@ -1,33 +1,32 @@
 package auth
 
 import (
-	"encoding/json"
 	"evermos/models"
-	"net/http"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // REGISTER
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+func RegisterHandler(c *fiber.Ctx) error {
 	var input models.User
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Invalid input",
+		})
 	}
 
 	user, err := Register(input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal Register Pengguna",
 			"errors":  []string{err.Error()},
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil membuat data",
 		"data":    user,
@@ -35,31 +34,29 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // LOGIN
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(c *fiber.Ctx) error {
 	var input struct {
 		NoTelp    string `json:"notelp"`
 		KataSandi string `json:"kata_sandi"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Invalid input",
+		})
 	}
 
 	result, err := Login(input.NoTelp, input.KataSandi)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal Login",
 			"errors":  []string{err.Error()},
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil Login",
 		"data":    result,
@@ -67,11 +64,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // LOGOUT
-func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// Untuk stateless JWT, logout cukup memberikan respons sukses
-	// dan membiarkan client menghapus tokennya sendiri
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+func LogoutHandler(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil Logout",
 		"data":    nil,

@@ -11,75 +11,69 @@ import (
 	"evermos/config"
 	"evermos/middleware"
 	"log"
-	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
 	// Koneksi ke database
 	config.InitDB()
 
-	// Routes requests
-	r := mux.NewRouter()
+	// Inisialisasi Fiber untuk API
+	app := fiber.New()
 
-	// Route Register/Login/Logout
-	r.HandleFunc("/api/auth/register", auth.RegisterHandler).Methods("POST")
-	r.HandleFunc("/api/auth/login", auth.LoginHandler).Methods("POST")
-	r.HandleFunc("/api/auth/logout", auth.LogoutHandler).Methods("POST")
+	// Register/Login/Logout
+	api := app.Group("/api")
 
-	// Route API Wilayah
-	r.HandleFunc("/api/provinsi", wilayah.GetProvincesHandler).Methods("GET")
-	r.HandleFunc("/api/kota/{id_provinsi}", wilayah.GetRegenciesHandler).Methods("GET")
+	authGroup := api.Group("/auth")
+	authGroup.Post("/register", auth.RegisterHandler)
+	authGroup.Post("/login", auth.LoginHandler)
+	authGroup.Post("/logout", auth.LogoutHandler)
 
-	// Route User (Akun dan Alamat)
-	userRouter := r.PathPrefix("/api/user").Subrouter()
-	userRouter.Use(middleware.AuthMiddleware)
-	userRouter.HandleFunc("/me", user.GetMyProfileHandler).Methods("GET")
-	userRouter.HandleFunc("/me", user.UpdateProfileHandler).Methods("PUT")
-	userRouter.HandleFunc("/change-pwd", user.ChangePasswordHandler).Methods("PUT")
-	userRouter.HandleFunc("/alamat", user.GetMyAlamatHandler).Methods("GET")
-	userRouter.HandleFunc("/alamat", user.CreateAlamatHandler).Methods("POST")
-	userRouter.HandleFunc("/alamat/{id}", user.UpdateAlamatHandler).Methods("PUT")
-	userRouter.HandleFunc("/alamat/{id}", user.DeleteAlamatHandler).Methods("DELETE")
+	// API Wilayah
+	api.Get("/provinsi", wilayah.GetProvincesHandler)
+	api.Get("/kota/:id_provinsi", wilayah.GetRegenciesHandler)
 
-	// Route Toko
-	tokoRouter := r.PathPrefix("/api/toko").Subrouter()
-	tokoRouter.Use(middleware.AuthMiddleware)
-	tokoRouter.HandleFunc("/my", toko.GetMyTokoHandler).Methods("GET")
-	tokoRouter.HandleFunc("/{id_toko}", toko.UpdateTokoHandler).Methods("PUT")
+	// User
+	userGroup := api.Group("/user", middleware.AuthMiddleware)
+	userGroup.Get("/me", user.GetMyProfileHandler)
+	userGroup.Put("/me", user.UpdateProfileHandler)
+	userGroup.Put("/change-password", user.ChangePasswordHandler)
 
-	// Route Kategori
-	// GET Kategori (semua user bisa lihat)
-	r.Handle("/api/category", middleware.AuthMiddleware(http.HandlerFunc(category.GetAllCategoryHandler))).Methods("GET")
+	// Alamat
+	userGroup.Get("/alamat", user.GetMyAlamatHandler)
+	userGroup.Post("/alamat", user.CreateAlamatHandler)
+	userGroup.Put("/alamat/:id", user.UpdateAlamatHandler)
+	userGroup.Delete("/alamat/:id", user.DeleteAlamatHandler)
 
-	// CRUD Kategori (bagi admin)
-	adminRouter := r.PathPrefix("/api/category").Subrouter()
-	adminRouter.Use(middleware.AuthMiddleware)
-	adminRouter.Use(middleware.AdminMiddleware)
-	adminRouter.HandleFunc("", category.CreateCategoryHandler).Methods("POST")
-	adminRouter.HandleFunc("/{id}", category.UpdateCategoryHandler).Methods("PUT")
-	adminRouter.HandleFunc("/{id}", category.DeleteCategoryHandler).Methods("DELETE")
+	// Toko
+	tokoGroup := api.Group("/toko", middleware.AuthMiddleware)
+	tokoGroup.Get("/my", toko.GetMyTokoHandler)
+	tokoGroup.Put("/:id_toko", toko.UpdateTokoHandler)
 
-	// Route Produk
-	// GET Produk (semua user bisa lihat)
-	r.HandleFunc("/api/produk", produk.GetAllProdukHandler).Methods("GET")
-	r.HandleFunc("/api/produk/{id}", produk.GetProdukByIDHandler).Methods("GET")
+	// Kategori
+	api.Get("/category", middleware.AuthMiddleware, category.GetAllCategoryHandler)
 
-	// Route CRUD hanya untuk Pemilik Toko
-	produkRouter := r.PathPrefix("/api/produk").Subrouter()
-	produkRouter.Use(middleware.AuthMiddleware)
-	produkRouter.HandleFunc("", produk.CreateProdukHandler).Methods("POST")
-	produkRouter.HandleFunc("/{id}", produk.UpdateProdukHandler).Methods("PUT")
-	produkRouter.HandleFunc("/{id}", produk.DeleteProdukHandler).Methods("DELETE")
+	// CRUD Kategori (Admin)
+	adminCat := api.Group("/category", middleware.AuthMiddleware, middleware.AdminMiddleware)
+	adminCat.Post("/", category.CreateCategoryHandler)
+	adminCat.Put("/:id", category.UpdateCategoryHandler)
+	adminCat.Delete("/:id", category.DeleteCategoryHandler)
 
-	// Route Transaksi
-	trxRouter := r.PathPrefix("/api/trx").Subrouter()
-	trxRouter.Use(middleware.AuthMiddleware)
-	trxRouter.HandleFunc("", transaction.GetAllTrxHandler).Methods("GET")
-	trxRouter.HandleFunc("", transaction.CreateTrxHandler).Methods("POST")
+	// Produk
+	api.Get("/produk", produk.GetAllProdukHandler)
+	api.Get("/produk/:id", produk.GetProdukByIDHandler)
+
+	produkOwner := api.Group("/produk", middleware.AuthMiddleware)
+	produkOwner.Post("/", produk.CreateProdukHandler)
+	produkOwner.Put("/:id", produk.UpdateProdukHandler)
+	produkOwner.Delete("/:id", produk.DeleteProdukHandler)
+
+	// Transaksi
+	trxGroup := api.Group("/api/trx", middleware.AuthMiddleware)
+	trxGroup.Get("/", transaction.GetAllTrxHandler)
+	trxGroup.Post("/", transaction.CreateTrxHandler)
 
 	// Jalankan Server
-	log.Println("Server running on port 8000")
-	log.Fatal(http.ListenAndServe(":8000", r))
+	log.Fatal(app.Listen(":8000"))
 }

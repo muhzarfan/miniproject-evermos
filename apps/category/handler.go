@@ -1,35 +1,33 @@
 package category
 
 import (
-	"encoding/json"
 	"evermos/models"
-	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 )
 
 // Membuat kategori baru (POST)
-func CreateCategoryHandler(w http.ResponseWriter, r *http.Request) {
+func CreateCategoryHandler(c *fiber.Ctx) error {
 	var input models.Category
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
+
+	// Fiber menggunakan BodyParser untuk JSON
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Invalid input",
+		})
 	}
 
 	res, err := CreateCategory(input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  false,
 			"message": "Gagal membuat kategori",
 		})
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil membuat data",
 		"data":    res.ID,
@@ -37,17 +35,16 @@ func CreateCategoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Mengambil semua kategori (GET)
-func GetAllCategoryHandler(w http.ResponseWriter, r *http.Request) {
+func GetAllCategoryHandler(c *fiber.Ctx) error {
 	res, err := GetAllCategories()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal mengambil data"})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal mengambil data",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil mendapatkan data",
 		"data":    res,
@@ -55,23 +52,21 @@ func GetAllCategoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Memperbarui kategori (PUT)
-func UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
+func UpdateCategoryHandler(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
 
 	var input models.Category
-	json.NewDecoder(r.Body).Decode(&input)
+	c.BodyParser(&input)
 
 	err := UpdateCategory(uint(id), input)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal update kategori"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal update kategori",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil memperbarui data",
 		"data":    "",
@@ -79,20 +74,18 @@ func UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Menghapus kategori (DELETE)
-func DeleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
+func DeleteCategoryHandler(c *fiber.Ctx) error {
+	id, _ := strconv.Atoi(c.Params("id"))
 
 	err := DeleteCategory(uint(id))
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": false, "message": "Gagal menghapus kategori"})
-		return
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  false,
+			"message": "Gagal menghapus kategori",
+		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	return c.JSON(fiber.Map{
 		"status":  true,
 		"message": "Berhasil menghapus data",
 		"data":    "",
