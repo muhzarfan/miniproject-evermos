@@ -70,7 +70,7 @@ func main() {
 	produkOwner.Delete("/:id", produk.DeleteProdukHandler)
 
 	// Transaksi
-	trxGroup := api.Group("/api/trx", middleware.AuthMiddleware)
+	trxGroup := api.Group("/trx", middleware.AuthMiddleware)
 	trxGroup.Get("/", transaction.GetAllTrxHandler)
 	trxGroup.Post("/", transaction.CreateTrxHandler)
 
