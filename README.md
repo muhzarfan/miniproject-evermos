@@ -1,5 +1,6 @@
 # Mini Project - Golang Backend Evermos
 
+Nama: Muhammad Zharfan Alfanso <br><br>
 Repositori ini adalah program backend menggunakan Golang untuk aplikasi Evermos. Evermos merupakan platform social commerce reseller untuk menjual produk-produk Muslim Indonesia. Pada program ini terdapat beberapa fitur, diantaranya:
 - Register dan Login untuk User.
 - Pengelolaan akun dan toko.
