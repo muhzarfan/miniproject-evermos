@@ -54,7 +54,7 @@ go run main.go
 ---
 
 ## Dokumentasi API
-**Note:**
+**NOTE:**
 Beberapa endpoint membutuhkan `token` untuk melakukan request yang didapat dari body response setelah login pengguna.
 ### 1. Register User
 Request:
