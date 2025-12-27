@@ -59,7 +59,7 @@ Beberapa endpoint membutuhkan `token` untuk melakukan request yang didapat dari 
 ### 1. Register User
 Request:
 ```http
-POST http://localhost:8000/api/auth/login
+POST http://localhost:8000/api/auth/register
 ```
 Body:
 ```json
@@ -265,6 +265,7 @@ Request (`id` disesuaikan dengan kategori yang ingin dihapus):
 ```http
 DELETE http://localhost:8000/api/category/{:id}
 ```
+**NOTE**: Untuk mengubah status user menjadi admin perlu mengubah value dari `isAdmin` menjadi `1` pada tabel `user` di database.
 
 ### 7. Service Produk
 **a. Get Kategori** <br>
