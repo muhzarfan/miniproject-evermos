@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -22,7 +24,24 @@ func AuthMiddleware(c *fiber.Ctx) error {
 		return []byte("secret_key"), nil
 	})
 
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status":  false,
+			"message": "Token tidak valid atau sudah kedaluwarsa",
+			"errors":  []string{err.Error()},
+		})
+	}
+
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if exp, ok := claims["exp"].(float64); ok {
+			if float64(time.Now().Unix()) > exp {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"status":  false,
+					"message": "Token sudah kedaluwarsa",
+				})
+			}
+		}
+
 		c.Locals("user_id", claims["id"])
 		c.Locals("is_admin", claims["is_admin"])
 		return c.Next()
@@ -31,7 +50,6 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 		"status":  false,
 		"message": "Unauthorized",
-		"errors":  []string{err.Error()},
 	})
 }
 

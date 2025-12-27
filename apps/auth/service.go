@@ -5,6 +5,9 @@ import (
 	"evermos/config"
 	"evermos/helper"
 	"evermos/models"
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // REGISTER
@@ -38,28 +41,32 @@ func Register(input models.User) (models.User, error) {
 // LOGIN
 func Login(notelp string, password string) (map[string]interface{}, error) {
 	var user models.User
-	// Cari user berdasarkan notelp
 	if err := config.DB.Where("notelp = ?", notelp).First(&user).Error; err != nil {
 		return nil, errors.New("Nomor Telepon atau Password salah")
 	}
 
-	// verifikasi password menggunakan helper bcrypt
 	if !helper.CheckPassword(password, user.KataSandi) {
 		return nil, errors.New("Nomor Telepon atau Password salah")
 	}
 
-	// jwt token
-	token, err := helper.GenerateToken(user.ID, user.IsAdmin)
+	// Token expired dalam 7 hari
+	claims := jwt.MapClaims{
+		"id":       user.ID,
+		"is_admin": user.IsAdmin,
+		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), //
+	}
+
+	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := tkn.SignedString([]byte("secret_key"))
 	if err != nil {
 		return nil, err
 	}
 
-	// menyusun respons data
 	result := map[string]interface{}{
 		"nama":    user.Nama,
 		"no_telp": user.Notelp,
 		"email":   user.Email,
-		"token":   token,
+		"token":   tokenString,
 	}
 
 	return result, nil
