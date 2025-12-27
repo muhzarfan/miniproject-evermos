@@ -5,7 +5,7 @@ Repositori ini adalah program backend menggunakan Golang untuk aplikasi Evermos.
 - Pengelolaan akun dan toko.
 - Pengelolaan produk dan alamat.
 - Pengelolaan kategori bagi admin.
-- Transaksi dengan riwayat.
+- Transaksi dengan log riwayat.
 
 ---
 
@@ -264,3 +264,98 @@ Request (`id` disesuaikan dengan kategori yang ingin dihapus):
 ```http
 DELETE http://localhost:8000/api/category/{:id}
 ```
+
+### 7. Service Produk
+**a. Get Kategori** <br>
+Request:
+```http
+GET http://localhost:8000/api/produk
+```
+Header:
+| Key | Value |
+|-----|-------|
+| token | token-acak-login |
+
+**b. Create Produk** <br>
+Request:
+```http
+POST http://localhost:8000/api/produk
+```
+Body (`id_category` disesuaikan dengan kategori yang tersedia):
+```json
+{
+    "nama_produk": "Baju Koko Pria",
+    "slug": "baju-koko-pria",
+    "harga_reseller": "180000",
+    "harga_konsumen": "200000",
+    "stok": 50,
+    "deskripsi": "Baju koko pria kasual yang cocok untuk acara dan ibadah.",
+    "id_category": 1
+}
+```
+Header:
+| Key | Value |
+|-----|-------|
+| token | token-acak-login |
+
+**c. Edit Produk** <br>
+Request (`id` sesuaikan dengan produk yang ingin diubah):
+```http
+PUT http://localhost:8000/api/produk/{:id}
+```
+Body:
+```json
+{
+    "nama_produk": "Baju Gamis Pria",
+    "slug": "baju-gamis-pria",
+    "harga_reseller": "180000",
+    "harga_konsumen": "200000",
+    "stok": 100,
+    "deskripsi": "Baju gamis pria kasual yang cocok untuk acara dan ibadah.",
+    "id_category": 2
+}
+```
+Header:
+| Key | Value |
+|-----|-------|
+| token | token-acak-login |
+
+**d. Delete Produk** <br>
+Request (`id` disesuaikan dengan produk yang ingin dihapus):
+```http
+DELETE http://localhost:8000/api/produk/{:id}
+```
+
+### 7. Service Transaksi
+**a. Get Transaksi** <br>
+Request:
+```http
+GET http://localhost:8000/api/trx
+```
+Header:
+| Key | Value |
+|-----|-------|
+| token | token-acak-login |
+
+**b. Create Transaksi** <br>
+Request:
+```http
+POST http://localhost:8000/api/trx
+```
+Body:
+```json
+{
+    "alamat_pengiriman": 1,
+    "method_bayar": "Transffer Bank",
+    "details": [
+        {
+            "id_log_produk": 2,
+            "kuantitas": 20
+        }
+    ]
+}
+```
+- `alamat_pengiriman` disesuaikan dengan id alamat tujuan.
+- `id_log_produk` disesuaikan dengan id produk.
+- Program akan otomatis mengurangi stok produk setelah melakukan transaksi.
+- Hasil invoice akan disimpan pada tabel `detail_trx` dan produk akan terisi pada tabel `log_produk` ketika melakukan transaksi. 
